@@ -25,6 +25,11 @@
 	<plugins>
 		<plugin interceptor="com.chrhc.mybatis.locker.interceptor.OptimisticLocker"/>
 	</plugins>
+	
+	实体可继承VersionEntity，使用version。
+	
+	数据库表中增加NUMBER型字段VERSION，从0开始。
+	
 
 ----------
 
@@ -35,8 +40,8 @@
 	<plugins>
 		<plugin interceptor="com.chrhc.mybatis.locker.interceptor.OptimisticLocker">
 		        <property name="forceLock" value="true"></property><!--强制所有update加锁，默认为false-->
-			<property name="versionColumn" value="xxx"/><!--数据库的列名-->
-			<property name="versionField" value="xxx"/> <!--java字段名-->
+			<property name="versionColumn" value="xxx"/><!--数据库的列名，建议默认-->
+			<property name="versionField" value="xxx"/> <!--java字段名，建议默认-->
 		</plugin>
 	</plugins>
 
