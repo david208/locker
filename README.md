@@ -19,6 +19,21 @@
 ----------
 
 	描述：本插件主要是为了给Update语句自动生成带有version的乐观锁。
+	<dependency>
+	            <groupId>com.chrhc.mybatis</groupId>
+      	            <artifactId>optimisticlocker</artifactId>
+ 	            <version>0.0.2</version>
+	</dependency>
+	 <dependency>
+			<groupId>org.mybatis</groupId>
+			<artifactId>mybatis</artifactId>
+			<version>3.4.1</version>
+	</dependency>
+	<dependency>
+			<groupId>org.mybatis</groupId>
+			<artifactId>mybatis-spring</artifactId>
+			<version>1.3.0</version>
+	</dependency>
 
 ----------
 ### 1. 使用方式：在mybatis配置文件中加入如下配置，就完成了。 ###
