@@ -81,6 +81,9 @@ public class OptimisticLocker implements Interceptor {
 
 	private boolean forceLock;
 
+	private String versionColumn = "version";
+	private String versionField = "version";
+
 	static {
 		try {
 			trueLocker = OptimisticLocker.class.getDeclaredMethod("versionValueTrue")
@@ -107,15 +110,6 @@ public class OptimisticLocker implements Interceptor {
 	public Object intercept(Invocation invocation) throws Exception {
 		String interceptMethod = invocation.getMethod().getName();
 		if ("prepare".equals(interceptMethod)) {
-			String versionColumn;
-			String versionField;
-			if (null == props || props.isEmpty()) {
-				versionColumn = "version";
-				versionField = "version";
-			} else {
-				versionColumn = props.getProperty("versionColumn", "version");
-				versionField = props.getProperty("versionField", "version");
-			}
 			StatementHandler handler = (StatementHandler) PluginUtil.processTarget(invocation.getTarget());
 			MetaObject metaObject = SystemMetaObject.forObject(handler);
 			MappedStatement ms = (MappedStatement) metaObject.getValue("delegate.mappedStatement");
@@ -149,8 +143,11 @@ public class OptimisticLocker implements Interceptor {
 			try {
 				Object result = invocation.proceed();
 				if (LockerSession.getLockerFlag()) {
-					if (((Integer) result) == 0)
+					if (((Integer) result) == 0) {
+						log.error("OptimisticLock冲突，数据已被其他程序修改");
 						throw new SQLException("OptimisticLock冲突，数据已被其他程序修改");
+					}
+
 				}
 				return result;
 			} finally {
@@ -181,7 +178,7 @@ public class OptimisticLocker implements Interceptor {
 			}
 			return stmt.toString();
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("增加乐观锁异常", e);
 			return originalSql;
 		}
 	}
@@ -315,20 +312,24 @@ public class OptimisticLocker implements Interceptor {
 
 	@Override
 	public Object plugin(Object target) {
-		/*
-		 * if (target instanceof StatementHandler || target instanceof
-		 * ParameterHandler || target instanceof BaseExecutor) {
-		 */
-		return Plugin.wrap(target, this);
-		/*
-		 * } else { return target; }
-		 */
+
+		if (target instanceof StatementHandler || target instanceof Executor) {
+
+			return Plugin.wrap(target, this);
+
+		} else {
+			return target;
+		}
+
 	}
 
 	@Override
 	public void setProperties(Properties properties) {
-		if (null != properties && !properties.isEmpty())
+		if (null != properties && !properties.isEmpty()) {
 			props = properties;
+			versionColumn = props.getProperty("versionColumn", "version");
+			versionField = props.getProperty("versionField", "version");
+		}
 	}
 
 	public boolean isForceLock() {
