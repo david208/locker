@@ -10,20 +10,6 @@
   <name>locker</name>
   <url>https://github.com/david208/locker</url>
   
-  <distributionManagement>
-		<repository>
-			<id>nexus-releases</id>
-			<name>Team Nexus public Repository</name>
-			<url>http://192.168.220.207:8081/content/repositories/releases/</url>
-		</repository>
-		<snapshotRepository>
-			<uniqueVersion>true</uniqueVersion>
-			<id>nexus-snapshots</id>
-			<name>Snapshots</name>
-			<url>http://192.168.220.207:8081/content/repositories/snapshots/</url>
-			<layout>default</layout>
-		</snapshotRepository>
-	</distributionManagement>
 
   <dependencies>
 		<dependency>
