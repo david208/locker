@@ -47,6 +47,8 @@
 	
 	如果乐观锁冲突，会抛SQLException异常，请自行处理事务。
 	
+	MAPPER的update方法上增加@VersionLocker
+	
 
 ----------
 
