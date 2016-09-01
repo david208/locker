@@ -4,11 +4,26 @@
 
 	<groupId>com.chrhc.mybatis</groupId>
 	<artifactId>optimisticlocker</artifactId>
-	<version>0.0.2</version>
+	<version>1.0.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
   <name>locker</name>
-  <url>https://github.com/xjs1919/locker</url>
+  <url>https://github.com/david208/locker</url>
+  
+  <distributionManagement>
+		<repository>
+			<id>nexus-releases</id>
+			<name>Team Nexus public Repository</name>
+			<url>http://192.168.220.207:8081/content/repositories/releases/</url>
+		</repository>
+		<snapshotRepository>
+			<uniqueVersion>true</uniqueVersion>
+			<id>nexus-snapshots</id>
+			<name>Snapshots</name>
+			<url>http://192.168.220.207:8081/content/repositories/snapshots/</url>
+			<layout>default</layout>
+		</snapshotRepository>
+	</distributionManagement>
 
   <dependencies>
 		<dependency>
@@ -88,23 +103,23 @@
 				</configuration>
 			</plugin>
 			
-			<plugin>
+			<!-- <plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-source-plugin</artifactId>
 				<version>2.4</version>
 				<executions>
 					<execution>
 						<id>attach-sources</id>
-						<!-- verify prepare-package -->
+						verify prepare-package
 						<phase>verify</phase>
 						<goals>
 							<goal>jar-no-fork</goal>
 						</goals>
 					</execution>
 				</executions>
-			</plugin>
+			</plugin> -->
 			
-			<plugin>
+			<!-- <plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-release-plugin</artifactId>
 				<version>2.5.2</version>
@@ -112,7 +127,7 @@
 					<useReleaseProfile>false</useReleaseProfile>
 					<autoVersionSubmodules>true</autoVersionSubmodules>
 				</configuration>
-			</plugin>
+			</plugin> -->
 			
 		</plugins>
 	</build>

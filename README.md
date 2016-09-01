@@ -17,12 +17,12 @@
 ## Document: ##
 	
 ----------
-
+    @update sm
 	描述：本插件主要是为了给Update语句自动生成带有version的乐观锁。
 	<dependency>
 	            <groupId>com.chrhc.mybatis</groupId>
       	            <artifactId>optimisticlocker</artifactId>
- 	            <version>0.0.2</version>
+ 	            <version>1.0.0-SNAPSHOT</version>
 	</dependency>
 	 <dependency>
 			<groupId>org.mybatis</groupId>
@@ -44,6 +44,8 @@
 	实体可继承VersionEntity，使用version。
 	
 	数据库表中增加NUMBER型字段VERSION，从0开始。
+	
+	如果乐观锁冲突，会抛SQLException异常，请自行处理事务。
 	
 
 ----------
