@@ -23,43 +23,48 @@
  */
 package com.chrhc.mybatis.locker.cache;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.ibatis.logging.Log;
 import org.apache.ibatis.logging.LogFactory;
+import org.apache.ibatis.mapping.MappedStatement;
 
 import com.chrhc.mybatis.locker.annotation.VersionLocker;
 
 public class LocalVersionLockerCache implements VersionLockerCache {
-	
+
 	private static final Log log = LogFactory.getLog(LocalVersionLockerCache.class);
 	private ConcurrentHashMap<String, ConcurrentHashMap<VersionLockerCache.MethodSignature, VersionLocker>> caches = new ConcurrentHashMap<>();
-	
+
+	private Map<MappedStatement, String> sqlCache = new ConcurrentHashMap<MappedStatement, String>();
+
 	@Override
 	public boolean containMethodSignature(MethodSignature vm) {
 		String nameSpace = getNameSpace(vm);
 		ConcurrentHashMap<VersionLockerCache.MethodSignature, VersionLocker> cache = caches.get(nameSpace);
-		if(null == cache || cache.isEmpty()) {
+		if (null == cache || cache.isEmpty()) {
 			return false;
 		}
 		boolean containsMethodSignature = cache.containsKey(vm);
-		if(containsMethodSignature && log.isDebugEnabled()) {
+		if (containsMethodSignature && log.isDebugEnabled()) {
 			log.debug("The method " + nameSpace + vm.getId() + "is hit in cache.");
 		}
 		return containsMethodSignature;
 	}
-	
+
 	// 这里去掉synchronized或者重入锁，因为这里的操作满足幂等性
-	// Here remove synchronized keyword or ReentrantLock, because it's a idempotent operation
+	// Here remove synchronized keyword or ReentrantLock, because it's a
+	// idempotent operation
 	@Override
 	public void cacheMethod(VersionLockerCache.MethodSignature vm, VersionLocker locker) {
 		String nameSpace = getNameSpace(vm);
 		ConcurrentHashMap<VersionLockerCache.MethodSignature, VersionLocker> cache = caches.get(nameSpace);
-		if(null == cache || cache.isEmpty()) {
+		if (null == cache || cache.isEmpty()) {
 			cache = new ConcurrentHashMap<>();
 			cache.put(vm, locker);
 			caches.put(nameSpace, cache);
-			if(log.isDebugEnabled()) {
+			if (log.isDebugEnabled()) {
 				log.debug("Locker debug info ==> " + nameSpace + ": " + vm.getId() + " is cached.");
 			}
 		} else {
@@ -71,7 +76,7 @@ public class LocalVersionLockerCache implements VersionLockerCache {
 	public VersionLocker getVersionLocker(VersionLockerCache.MethodSignature vm) {
 		String nameSpace = getNameSpace(vm);
 		ConcurrentHashMap<VersionLockerCache.MethodSignature, VersionLocker> cache = caches.get(nameSpace);
-		if(null == cache || cache.isEmpty()) {
+		if (null == cache || cache.isEmpty()) {
 			return null;
 		}
 		return cache.get(vm);
@@ -81,6 +86,14 @@ public class LocalVersionLockerCache implements VersionLockerCache {
 		String id = vm.getId();
 		int pos = id.lastIndexOf(".");
 		return id.substring(0, pos);
+	}
+
+	public String getSql(MappedStatement ms) {
+		return this.sqlCache.get(ms);
+	}
+
+	public void putSql(MappedStatement ms, String queryCache) {
+		sqlCache.put(ms, queryCache);
 	}
 
 }

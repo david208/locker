@@ -41,11 +41,15 @@
 		<plugin interceptor="com.chrhc.mybatis.locker.interceptor.OptimisticLocker"/>
 	</plugins>
 	
-	实体可继承VersionEntity，使用version。
+	实体可继承VersionEntity，或者自行增加version 以及@VersionLocker 。
+	
+	MAPPER的方法自行增加@VersionLocker
 	
 	数据库表中增加NUMBER型字段VERSION，从0开始。
 	
 	如果乐观锁冲突，会抛SQLException异常，请自行处理事务。
+	
+
 	
 
 ----------
@@ -56,7 +60,7 @@
 
 	<plugins>
 		<plugin interceptor="com.chrhc.mybatis.locker.interceptor.OptimisticLocker">
-		        <property name="forceLock" value="true"></property><!--强制所有update加锁，默认为false-->
+		        <property name="forceLock" value="false"></property><!--强制所有update加锁，默认为false-->
 			<property name="versionColumn" value="xxx"/><!--数据库的列名，建议默认-->
 			<property name="versionField" value="xxx"/> <!--java字段名，建议默认-->
 		</plugin>
@@ -68,6 +72,10 @@
 > 之前：**update user set name = ?, password = ?  where id = ?**
 
 > 之后：**update user set name = ?, password = ?, version = version+1 where id = ? and version = ?**
+
+> 之前：**select id, name from user where id = ?**
+
+> 之后：**select id, name, version from user where id = ?**
 
 ----------
 

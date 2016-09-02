@@ -45,7 +45,6 @@ import com.chrhc.mybatis.locker.cache.Cache;
 import com.chrhc.mybatis.locker.cache.Cache.MethodSignature;
 import com.chrhc.mybatis.locker.cache.LocalVersionLockerCache;
 import com.chrhc.mybatis.locker.cache.LockerSession;
-import com.chrhc.mybatis.locker.cache.VersionLockerCache;
 import com.chrhc.mybatis.locker.util.PluginUtil;
 
 import net.sf.jsqlparser.expression.Expression;
@@ -56,6 +55,10 @@ import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.Statement;
+import net.sf.jsqlparser.statement.select.PlainSelect;
+import net.sf.jsqlparser.statement.select.Select;
+import net.sf.jsqlparser.statement.select.SelectExpressionItem;
+import net.sf.jsqlparser.statement.select.SelectItem;
 import net.sf.jsqlparser.statement.update.Update;
 
 /**
@@ -68,6 +71,7 @@ import net.sf.jsqlparser.statement.update.Update;
  * @date 2016-05-27
  * @version 1.0
  * @since JDK1.7
+ * @update david208
  *
  */
 @Intercepts({ @Signature(type = StatementHandler.class, method = "prepare", args = { Connection.class, Integer.class }),
@@ -81,7 +85,7 @@ public class OptimisticLocker implements Interceptor {
 
 	private boolean forceLock;
 
-	private String versionColumn = "version";
+	private String versionColumn = "VERSION";
 	private String versionField = "version";
 
 	static {
@@ -96,7 +100,7 @@ public class OptimisticLocker implements Interceptor {
 	}
 
 	private Properties props = null;
-	private VersionLockerCache versionLockerCache = new LocalVersionLockerCache();
+	private LocalVersionLockerCache versionLockerCache = new LocalVersionLockerCache();
 
 	@VersionLocker(true)
 	private void versionValueTrue() {
@@ -114,28 +118,51 @@ public class OptimisticLocker implements Interceptor {
 			MetaObject metaObject = SystemMetaObject.forObject(handler);
 			MappedStatement ms = (MappedStatement) metaObject.getValue("delegate.mappedStatement");
 			SqlCommandType sqlCmdType = ms.getSqlCommandType();
-			if (sqlCmdType != SqlCommandType.UPDATE) {
-				return invocation.proceed();
+			String sql = versionLockerCache.getSql(ms);
+			String originalSql;
+			if (sqlCmdType == SqlCommandType.UPDATE) {
+				Object originalVersion = metaObject.getValue("delegate.boundSql.parameterObject." + versionField);
+
+				if (null != sql && !sql.isEmpty()) {
+					originalSql = addVersionToWhere(versionColumn, originalVersion, sql);
+					metaObject.setValue("delegate.boundSql.sql", originalSql);
+					return invocation.proceed();
+				}
+				BoundSql boundSql = (BoundSql) metaObject.getValue("delegate.boundSql");
+				VersionLocker vl = getVersionLocker(ms, boundSql);
+				if (null != vl && !vl.value()) {
+					return invocation.proceed();
+				}
+				if (originalVersion == null || Long.parseLong(originalVersion.toString()) <= 0) {
+					throw new BindingException("value of version field[" + versionField + "]can not be empty");
+				}
+				originalSql = boundSql.getSql();
+				originalSql  = addVersionToSql(ms,originalSql, versionColumn, originalVersion);
+				if (log.isDebugEnabled()) {
+					log.debug("==> originalSql: " + originalSql);
+				}
+				
+				metaObject.setValue("delegate.boundSql.sql", originalSql);
+				if (log.isDebugEnabled()) {
+					log.debug("==> originalSql after add version: " + originalSql);
+				}
+				LockerSession.setLockerFlag(true);
+			} else if (sqlCmdType == SqlCommandType.SELECT) {
+				if (null != sql && !sql.isEmpty()) {
+					originalSql = sql;
+					metaObject.setValue("delegate.boundSql.sql", originalSql);
+					return invocation.proceed();
+				}
+				if (null != ms.getResultMaps().get(0).getType().getAnnotation(VersionLocker.class)) {
+					BoundSql boundSql = (BoundSql) metaObject.getValue("delegate.boundSql");
+					originalSql = boundSql.getSql();
+					originalSql = addVersionToQuerySql(originalSql, versionColumn);
+					metaObject.setValue("delegate.boundSql.sql", originalSql);
+					versionLockerCache.putSql(ms, originalSql);
+					return invocation.proceed();
+				}
 			}
-			BoundSql boundSql = (BoundSql) metaObject.getValue("delegate.boundSql");
-			VersionLocker vl = getVersionLocker(ms, boundSql);
-			if (null != vl && !vl.value()) {
-				return invocation.proceed();
-			}
-			Object originalVersion = metaObject.getValue("delegate.boundSql.parameterObject." + versionField);
-			if (originalVersion == null || Long.parseLong(originalVersion.toString()) <= 0) {
-				throw new BindingException("value of version field[" + versionField + "]can not be empty");
-			}
-			String originalSql = boundSql.getSql();
-			if (log.isDebugEnabled()) {
-				log.debug("==> originalSql: " + originalSql);
-			}
-			originalSql = addVersionToSql(originalSql, versionColumn, originalVersion);
-			metaObject.setValue("delegate.boundSql.sql", originalSql);
-			if (log.isDebugEnabled()) {
-				log.debug("==> originalSql after add version: " + originalSql);
-			}
-			LockerSession.setLockerFlag(true);
+
 			return invocation.proceed();
 		}
 
@@ -159,7 +186,43 @@ public class OptimisticLocker implements Interceptor {
 
 	}
 
-	private String addVersionToSql(String originalSql, String versionColumnName, Object originalVersion) {
+	private String addVersionToQuerySql(String originalSql, String versionColumnName) {
+		try {
+			Statement stmt = CCJSqlParserUtil.parse(originalSql);
+			if (!(stmt instanceof Select)) {
+				return originalSql;
+			}
+			Select select = (Select) stmt;
+			if (!contains(select, versionColumnName)) {
+				buildVersionExpression(select, versionColumnName);
+			}
+
+			return stmt.toString();
+		} catch (Exception e) {
+			log.error("增加乐观锁异常", e);
+			return originalSql;
+		}
+	}
+
+	private void buildVersionExpression(Select select, String versionColumnName) {
+		List<SelectItem> selectItems = ((PlainSelect) select.getSelectBody()).getSelectItems();
+		SelectExpressionItem expressionItem = new SelectExpressionItem();
+		expressionItem.setExpression(new Column(versionColumnName.toUpperCase()));
+		selectItems.add(expressionItem);
+
+	}
+
+	private boolean contains(Select select, String versionColumnName) {
+		List<SelectItem> selectItems = ((PlainSelect) select.getSelectBody()).getSelectItems();
+		for (SelectItem item : selectItems) {
+			if (item.toString().equalsIgnoreCase(versionColumnName)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private String addVersionToSql(MappedStatement ms,String originalSql, String versionColumnName, Object originalVersion) {
 		try {
 			Statement stmt = CCJSqlParserUtil.parse(originalSql);
 			if (!(stmt instanceof Update)) {
@@ -169,17 +232,45 @@ public class OptimisticLocker implements Interceptor {
 			if (!contains(update, versionColumnName)) {
 				buildVersionExpression(update, versionColumnName);
 			}
-			Expression where = update.getWhere();
-			if (where != null) {
-				AndExpression and = new AndExpression(where, buildVersionEquals(versionColumnName, originalVersion));
-				update.setWhere(and);
-			} else {
-				update.setWhere(buildVersionEquals(versionColumnName, originalVersion));
-			}
+			versionLockerCache.putSql(ms, update.toString());
+			addVersionToWhere(versionColumnName, originalVersion, update);
 			return stmt.toString();
 		} catch (Exception e) {
 			log.error("增加乐观锁异常", e);
 			return originalSql;
+		}
+	}
+
+	/**
+	 * 走缓存之后的
+	 * 
+	 * @param versionColumnName
+	 * @param originalVersion
+	 * @param originalSql
+	 * @return
+	 */
+	private String addVersionToWhere(String versionColumnName, Object originalVersion, String originalSql) {
+		try {
+			Statement stmt = CCJSqlParserUtil.parse(originalSql);
+			if (!(stmt instanceof Update)) {
+				return originalSql;
+			}
+			Update update = (Update) stmt;
+			addVersionToWhere(versionColumnName, originalVersion, update);
+			return stmt.toString();
+		} catch (Exception e) {
+			log.error("增加乐观锁异常", e);
+			return originalSql;
+		}
+	}
+
+	private void addVersionToWhere(String versionColumnName, Object originalVersion, Update update) {
+		Expression where = update.getWhere();
+		if (where != null) {
+			AndExpression and = new AndExpression(where, buildVersionEquals(versionColumnName, originalVersion));
+			update.setWhere(and);
+		} else {
+			update.setWhere(buildVersionEquals(versionColumnName, originalVersion));
 		}
 	}
 
