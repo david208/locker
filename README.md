@@ -51,6 +51,8 @@
 	
 
 	
+	MAPPER的update方法上增加@VersionLocker
+	
 
 ----------
 
