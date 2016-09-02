@@ -100,7 +100,7 @@
 	1、本插件拦截的update语句的Statement都是PreparedStatement，仅针对这种方式的sql有效；
 	2、mapper.xml的<update>标签必须要与接口Mapper的方法对应上，也就是使用mybatis推荐的方式，
 	   但是多个接口可以对应一个mapper.xml的<update>标签；
-	3、本插件不会对sql的结果做任何操作，sql本身应该返回什么就是什么；
+	3、本插件只会对select的结果增加version，必须entity继承VersionEntity或者增加@VersionLocker才起作用；其他类型的语句的结果不做任何    修改；
 	4、插件默认不拦截所有update语句，如果用户对某个update希望有乐观锁控制，那么在对应的mapper接口
 	   方法上面增加@VersionLocker。
 	   反之，如果设置forceLock为true，如果用户不想对某个update希望有乐观锁控制，那么在对应的mapper接口
@@ -119,5 +119,4 @@
 ----------
 
 ### 8.关于作者： ###
-	作者QQ：
-	作者邮箱：@qq.com
+	修改者QQ：27495422
